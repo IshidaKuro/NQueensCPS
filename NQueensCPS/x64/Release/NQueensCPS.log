@@ -1,0 +1,8 @@
+﻿  Source.cpp
+C:\Users\Lewis\source\repos\NQueensCPS\NQueensCPS\Source.cpp(56,1): warning C4267: 'return': conversion from 'size_t' to 'int', possible loss of data
+  Generating code
+  4 of 230 functions ( 1.7%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  NQueensCPS.vcxproj -> C:\Users\Lewis\source\repos\NQueensCPS\x64\Release\NQueensCPS.exe

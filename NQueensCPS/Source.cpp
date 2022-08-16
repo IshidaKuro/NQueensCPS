@@ -186,6 +186,8 @@ int main(int argc, char** argv)
 	{
 	auto start = chrono::high_resolution_clock::now();
 /*
+* 
+* place to store different methods of distribution
 	thread threads[n];
 	for (int i = 0; i < n; i++)
 	{

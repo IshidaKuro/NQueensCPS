@@ -4,84 +4,34 @@
 #include <ctime>
 #include <vector>
 #include <mutex>
-#include <omp.h>
+#include <omp_llvm.h>
+
 using namespace std;
 
+const int n = 5;// The N in N - Queens
+int threadcount = n;
 
-const int n = 6; //The N in N-Queens
-
-int threadcount =n; // number of threads to use for processing
 int runs = 10; //number of times to run algorithm for performance testing.
 
+vector<vector<int>> solutions; //somewhere to store our solutions
 
-
-struct spile
-{
-	void Add(vector<int> c)
-	{
-		lock_guard<std::mutex> guard(mutex);
-		s.push_back(c);
-	}
-
-	void Clear()
-	{
-		s.clear();
-	}
-
-	bool Contains(vector<int> c)
-	{
-		lock_guard<std::mutex> guard(mutex);
-		if (std::find(s.begin(), s.end(), c) != s.end())
-		{
-			return true;
-		}
-		else
-		{
-			s.push_back(c);
-			return false;
-		}
-	}
-
-	void Combine(vector<vector<int>> q)
-	{
-		lock_guard<std::mutex> guard(mutex);
-		for(vector<int> var : q)
-		{
-			s.push_back(var);
-		}
-	}
-
-	int Count()
-	{
-		return s.size();
-	}
-private:
-	std::mutex mutex;
-	vector<vector<int>> s;
-
-};
-
-spile results;
-
+//helper function to make sure diagonal squares are not occupied
 bool CheckDiagonals(int x, int y, vector<int> q)
-{
-	
-	for (int i =1; i <= x; i++)
+{	
+	for (int i =x; i >= 1; i--)
 	{
 		if (q[x - i] == y - i || q[x - i] == y + i)
 		{
 			return false;
 		}
 	}
-
 	return true;
-
 }
 
 int sum(bool q[n], int x)
 {
 	int s = 0;
-	for (int i = 0; i < x; i++)
+	for (int i = n - 1; i >= 0; i--)
 	{
 		if (q[i])
 		{
@@ -92,73 +42,197 @@ int sum(bool q[n], int x)
 }
 
 
-void Navigate(int p)
+int TryNext(bool t[n], bool x[n])
 {
-	vector<vector<int>> solutions; //store the solutions found by this thread
-	bool finished = false; //flag if this thread is finished
+	for (int i = n-1; i >=0; i--)
+	{
+		if (!t[i]&&!x[i]) { return i; }
+	}
+	return -2;
+}
+
+void NavigateNoRand(int p, int q) {
+	bool finished = false;
 	bool taken[n] = { false }; // store if this row/column has been populated
-	bool tried[n][n] = { false }; //store the squares that have been checked
-	vector<int> queens; //store where we have placed a queen
+	bool tried[n][n] = { {false} }; //store the squares that have been checked
+
+
+	vector<int> queens;
+	vector<vector<int>> s;
 
 	queens.push_back(p);
-	taken[p] = true;
-	
-	int x = 1, y = 0; //initialise navigation variables
+	queens.push_back(q);
 
-	//select a random square
+	taken[p] = true;
+	taken[q] = true;
 	
+	//initialise navigation variables
+	int x = 2, y = 0; 
+
 	while (!finished)
 	{
-		y = rand() % n;		
+
+		//select a random square
+		y = TryNext(taken,tried[x]);
 		//if the row is clear and the square has not been tried	
-		if (!taken[y] && !tried[x][y])
+		if (y != -2)
 		{
 			tried[x][y] = true; //mark the square as tried
-
-			if (CheckDiagonals(x, y, queens)) //if the diaganols are clear 
+			if (CheckDiagonals(x, y, queens)) //if the diaganols are clear, place the queen and move on to the next column
 			{
-				//place the queen
-				queens.push_back(y); 
-				//mark the row as taken
-				taken[y] = true; 
-				//move on to the next column
+				queens.push_back(y);
+				taken[y] = true;
 				x++;
 				if (x == n) //if we are at the end of the board
 				{
-					if (std::find(solutions.begin(), solutions.end(), queens) != solutions.end()) //if we have found the solution before
+					//if the solution has already been recorded
+					if (find(s.begin(), s.end(), queens) != s.end())
 					{
-						//remove the last queen we placed
 						taken[queens.back()] = false;
-						queens.pop_back();
-						
-						//step back
-						x--;
+						queens.pop_back();//remove the last queen we placed
+						x--; //step back
 					}
-					else //if we have not found this solution before
+					//if this is a new solution
+					else
 					{
 						//add the solution to the list	
-						solutions.push_back(queens);
+						s.push_back(queens);
 						//reset and find another solution
 						queens.clear();
-						for (int i = 0; i < n; i++) //y values
+						for (int i = n - 1; i >= 0; i--) //y values
 						{
-							taken[i] = false;
-							for (int j = 1; j < n; j++) //x values
+							
+								taken[i] = false;
+							
+							for (int j = n - 1; j >= 2; j--) //x values
 							{
 								tried[j][i] = false;
 							}
 						}
 						queens.push_back(p);
+						queens.push_back(q);
 						taken[p] = true;
-						x = 1;
+						taken[q] = true;
+						
+						
+
+						x = 2;
+					}
+				}
+
+			}
+		}
+
+		//if we can not try any more locations
+		else{
+			if (x ==2)
+			{
+				finished = true;
+			}
+			taken[queens.back()] = false;
+
+			queens.pop_back();//remove the last queen we placed
+
+			for (int i = n - 1; i >= 0; i--)
+			{
+				tried[x][i] = false;
+			}
+
+			x--; //step back
+
+		}
+	}
+#pragma omp critical
+	{
+		for (vector<int> v : s)
+		{
+			solutions.push_back(v);
+		}
+	}
+}
+
+void Navigate(int p, int q)
+{
+	bool finished = false;
+	bool taken[n] = { false }; // store if this row/column has been populated
+	bool tried[n][n] = { {false} }; //store the squares that have been checked
+
+	vector<int> queens;
+	vector<vector<int>> s;
+
+	queens.push_back(p);
+	queens.push_back(q);
+
+	taken[p] = true;
+	taken[q] = true;
+
+	for (int i = 0; i < n; i++)
+	{
+		tried[0][i] = true;
+		tried[1][i] = true;
+	}
+	int x = 2, y = 0; //initialise navigation variables
+
+	while (!finished)
+	{
+		//select a random square
+		y = rand() % n;
+		//if the row is clear and the square has not been tried	
+		if (!taken[y] && !tried[x][y])
+		{
+			tried[x][y] = true; //mark the square as tried
+
+			if (CheckDiagonals(x, y, queens)) //if the diaganols are clear, place the queen and move on to the next column
+			{
+				queens.push_back(y);
+				taken[y] = true;
+				x++;
+				if (x == n) //if we are at the end of the board
+				{
+					//if the solution has already been recorded
+					if (find(s.begin(), s.end(), queens) != s.end())
+					{
+						taken[queens.back()] = false;
+
+						queens.pop_back();//remove the last queen we placed
+
+						x--; //step back
+					}
+
+					//if this is a new solution
+					else
+					{
+						//add the solution to the list	
+						s.push_back(queens);
+						//reset and find another solution
+						queens.clear();
+						for (int i = 0; i < n; i++) //y values
+						{
+							taken[i] = false;
+							for (int j = 2; j < n; j++) //x values
+							{
+								tried[j][i] = false;
+							}
+						}
+
+						queens.push_back(p);
+						queens.push_back(q);
+						taken[q] = true;
+						taken[p] = true;
+
+						x = 2;
 					}
 				}
 			}
 		}
 
-		if (sum(tried[x], n) + sum(taken, n) == n) //if we can not try any more locations
+		//if we can not try any more locations
+		if (sum(tried[x], n) + sum(taken, n) == n)
 		{
-			if (x == 1) { finished = true; }
+			if (x == 2)
+			{
+				finished = true;
+			}
 			taken[queens.back()] = false;
 
 			queens.pop_back();//remove the last queen we placed
@@ -172,80 +246,52 @@ void Navigate(int p)
 
 		}
 	}
+#pragma omp critical
+	{
+		for (vector<int> x : s)
+		{
 
-	results.Combine(solutions);
-	
+
+
+			solutions.push_back(x);
+
+		}
+	}
 }
+
 
 
 
 int main(int argc, char** argv)
 {
-	float meanTime = 0;
-	for(int r= 0; r<runs; r++)
+	//for (threadcount; threadcount < 17; threadcount *= 2)
 	{
-	auto start = chrono::high_resolution_clock::now();
-/*
-* 
-* place to store different methods of distribution
-	thread threads[n];
-	for (int i = 0; i < n; i++)
-	{
-		threads[i] = thread(Navigate, i);
+		long meantime = 0;
+		for (int r = runs - 1; r >= 0; r--)
+		{
+			auto start = chrono::system_clock::now();
 
+#pragma omp parallel for schedule(static) num_threads(threadcount) collapse(2)
+			for (int i = n - 1; i >= 0; i--)
+			{
+				for (int j = n - 1; j >= 0; j--)
+				{
+					if (j<i - 1 || j>i + 1)
+					{
+						NavigateNoRand(i, j);
+					}
+				}
+			}
+			auto end = chrono::system_clock::now();
+			meantime += chrono::duration_cast<chrono::microseconds>(end - start).count();
+			
+			//debug, output the number of solutions found this run
+			//std::cout << "Solutions Found = " << solutions.size() << " Time Taken = " << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
+			
+			solutions.clear();
+		}
+		std::cout << "Threads = " << threadcount << " Mean time to complete =" << meantime / runs << " microseconds" << endl;
 	}
-
-	for (int i = 0; i < n; i++)
-{
-	Navigate(i);
-}
-
-	for (auto& t : threads)
-	{
-		t.join();
-	}
-	
-	
-	*/
-	
-
-#pragma omp parallel for num_threads(threadcount)
-	for (int i = 0; i < n; i++)
-	{
-		Navigate(i);
-	}	
-	auto end = chrono::high_resolution_clock::now();
-	auto time = end - start;
-
-	cout << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << endl;
-	
-	results.Clear();
-}
-	cout << "Mean Time: " << meanTime << endl;
 		return 0;
 	
 }
-
-
-
-
-	//check if row is free, and if the if the square has been tried before
-
-	//mark position as tried
-
-	//check if diaganols are free
-
-	//add queen to the solution
-
-	//set row as used
-
-	//increment the column we are working on
-
-
-//function to check for diagonal queens
-
-//function to check for queens on same row
-
-//check for column queens
-
-

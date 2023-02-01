@@ -8,10 +8,9 @@
 
 using namespace std;
 
-const int n = 5;// The N in N - Queens
-int threadcount = n;
-
-int runs = 10; //number of times to run algorithm for performance testing.
+const int n = 12;// The N in N - Queens
+const int threadcount = 16; //number of threads to target
+const int runs = 10; //number of times to run algorithm for performance testing.
 
 vector<vector<int>> solutions; //somewhere to store our solutions
 
@@ -72,9 +71,9 @@ void NavigateNoRand(int p, int q) {
 	while (!finished)
 	{
 
-		//select a random square
+		//select the next square 
 		y = TryNext(taken,tried[x]);
-		//if the row is clear and the square has not been tried	
+		//if we can try a square
 		if (y != -2)
 		{
 			tried[x][y] = true; //mark the square as tried
@@ -125,14 +124,18 @@ void NavigateNoRand(int p, int q) {
 
 		//if we can not try any more locations
 		else{
+
+			//if we are back at the start and can't try any other squares, we are finished
 			if (x ==2)
 			{
 				finished = true;
 			}
+
+			//remove the last queen we placed
 			taken[queens.back()] = false;
+			queens.pop_back();
 
-			queens.pop_back();//remove the last queen we placed
-
+			//reset the squares that have been tried
 			for (int i = n - 1; i >= 0; i--)
 			{
 				tried[x][i] = false;
@@ -159,9 +162,10 @@ void Navigate(int p, int q)
 
 	vector<int> queens;
 	vector<vector<int>> s;
+	queens.reserve(n);
 
-	queens.push_back(p);
-	queens.push_back(q);
+	queens.emplace_back(p);
+	queens.emplace_back(q);
 
 	taken[p] = true;
 	taken[q] = true;
@@ -184,7 +188,7 @@ void Navigate(int p, int q)
 
 			if (CheckDiagonals(x, y, queens)) //if the diaganols are clear, place the queen and move on to the next column
 			{
-				queens.push_back(y);
+				queens.emplace_back(y);
 				taken[y] = true;
 				x++;
 				if (x == n) //if we are at the end of the board
@@ -203,7 +207,7 @@ void Navigate(int p, int q)
 					else
 					{
 						//add the solution to the list	
-						s.push_back(queens);
+						s.emplace_back(queens);
 						//reset and find another solution
 						queens.clear();
 						for (int i = 0; i < n; i++) //y values
@@ -215,8 +219,8 @@ void Navigate(int p, int q)
 							}
 						}
 
-						queens.push_back(p);
-						queens.push_back(q);
+						queens.emplace_back(p);
+						queens.emplace_back(q);
 						taken[q] = true;
 						taken[p] = true;
 
